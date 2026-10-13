@@ -4,54 +4,117 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Task Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <div class="container">
+    <main class="container">
 
-        <header>
-            <h1>Student Task Manager</h1>
-            <p>Organize your college tasks</p>
+        <header class="top">
+            <div>
+                <h1>Student Task Manager</h1>
+                <p>Organize your college tasks</p>
+            </div>
+            <button id="themeToggle" class="ghost" type="button">Dark mode</button>
         </header>
 
-        <div class="task-input">
-            <input
-                type="text"
-                id="taskInput"
-                placeholder="Enter a new task..."
-            >
-            <button onclick="addTask()">Add Task</button>
-        </div>
-
-        <div class="stats">
-            <div class="stat-box">
-                <h3 id="totalTasks">0</h3>
-                <p>Total Tasks</p>
+        <!-- Add task -->
+        <form id="taskForm" class="task-input" autocomplete="off">
+            <div class="field grow">
+                <label for="taskInput">Task</label>
+                <input type="text" id="taskInput" placeholder="e.g. Finish lab report" maxlength="120" required>
             </div>
 
+            <div class="field">
+                <label for="subjectInput">Subject</label>
+                <input type="text" id="subjectInput" list="subjectList" placeholder="Optional" maxlength="40">
+                <datalist id="subjectList"></datalist>
+            </div>
+
+            <div class="field">
+                <label for="dueInput">Due date</label>
+                <input type="date" id="dueInput">
+            </div>
+
+            <div class="field">
+                <label for="priorityInput">Priority</label>
+                <select id="priorityInput">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+
+            <button type="submit" class="primary">Add task</button>
+        </form>
+
+        <!-- Stats -->
+        <section class="stats" aria-label="Task summary">
+            <div class="stat-box">
+                <h3 id="totalTasks">0</h3>
+                <p>Total</p>
+            </div>
             <div class="stat-box">
                 <h3 id="completedTasks">0</h3>
                 <p>Completed</p>
             </div>
-
             <div class="stat-box">
                 <h3 id="pendingTasks">0</h3>
                 <p>Pending</p>
             </div>
+            <div class="stat-box">
+                <h3 id="overdueTasks">0</h3>
+                <p>Overdue</p>
+            </div>
+        </section>
+
+        <div class="progress-wrap">
+            <div id="progressBar" class="progress" role="progressbar" aria-label="Completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <span id="progressText">0% done</span>
         </div>
 
-        <div class="task-section">
+        <!-- Search, filter, sort -->
+        <div class="toolbar">
+            <input type="search" id="searchInput" placeholder="Search tasks (press / to focus)" aria-label="Search tasks">
+
+            <div class="segmented" id="filters" role="group" aria-label="Filter tasks">
+                <button type="button" data-filter="all" aria-pressed="true">All <span class="count">0</span></button>
+                <button type="button" data-filter="active" aria-pressed="false">Active <span class="count">0</span></button>
+                <button type="button" data-filter="completed" aria-pressed="false">Done <span class="count">0</span></button>
+            </div>
+
+            <select id="sortSelect" aria-label="Sort tasks">
+                <option value="due">Sort: Due date</option>
+                <option value="priority">Sort: Priority</option>
+                <option value="newest">Sort: Newest first</option>
+            </select>
+        </div>
+
+        <!-- Task list -->
+        <section class="task-section">
             <h2>My Tasks</h2>
 
-            <ul id="taskList">
-                <!-- Tasks will appear here -->
-            </ul>
+            <ul id="taskList" class="notebook"></ul>
 
-            <p id="emptyMessage">No tasks added yet.</p>
-        </div>
+            <p id="emptyMessage" class="empty">No tasks added yet.</p>
 
+            <footer class="list-footer">
+                <span id="tasksLeft">0 tasks left</span>
+                <button id="clearCompleted" class="link" type="button">Clear completed</button>
+            </footer>
+        </section>
+
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+        <span id="toastText"></span>
+        <button id="toastUndo" type="button">Undo</button>
     </div>
 
     <script src="script.js"></script>
