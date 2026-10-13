@@ -78,16 +78,20 @@ pipeline {
             steps {
                 echo 'Refreshing Amazon ECR image pull secret'
                 sh '''
+                    set +x
                     set -eu
 
-                    aws ecr get-login-password --region "$AWS_REGION" |
-                        kubectl create secret docker-registry ecr-registry-secret \
-                            --namespace student-task-manager \
-                            --docker-server="$ECR_REGISTRY" \
-                            --docker-username=AWS \
-                            --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
-                            --dry-run=client -o yaml |
-                        kubectl apply -f -
+                    ECR_PASSWORD="$(aws ecr get-login-password --region "$AWS_REGION")"
+
+                    kubectl create secret docker-registry ecr-registry-secret \
+                        --namespace student-task-manager \
+                        --docker-server="$ECR_REGISTRY" \
+                        --docker-username=AWS \
+                        --docker-password="$ECR_PASSWORD" \
+                        --dry-run=client -o yaml |
+                    kubectl apply -f -
+
+                    unset ECR_PASSWORD
                 '''
 
                 echo 'Updating Kubernetes deployment'
@@ -118,5 +122,6 @@ pipeline {
         }
     }
 }
+
 
 
