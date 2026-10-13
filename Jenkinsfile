@@ -6,6 +6,7 @@ pipeline {
         AWS_REGION = 'ap-southeast-2'
         ECR_REGISTRY = '756501293924.dkr.ecr.ap-southeast-2.amazonaws.com'
         ECR_REPOSITORY = 'student-task-manager'
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
     }
 
     stages {
@@ -20,9 +21,11 @@ pipeline {
             steps {
                 echo 'Validating project files'
                 sh '''
+                    set -eu
                     test -f index.html
                     test -f style.css
                     test -f script.js
+                    test -f Dockerfile
                 '''
             }
         }
@@ -31,6 +34,7 @@ pipeline {
             steps {
                 echo 'Running project validation'
                 sh '''
+                    set -eu
                     grep -q "Student Task Manager" index.html
                     grep -q "addTask" script.js
                 '''
@@ -41,6 +45,7 @@ pipeline {
             steps {
                 echo 'Building Docker image'
                 sh '''
+                    set -eu
                     docker build -t student-task-manager:${BUILD_NUMBER} .
                 '''
             }
@@ -51,7 +56,9 @@ pipeline {
                 echo 'Authenticating with Amazon ECR'
                 sh '''
                     set -eu
+
                     aws sts get-caller-identity
+
                     aws ecr get-login-password --region "$AWS_REGION" |
                         docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
@@ -66,15 +73,50 @@ pipeline {
                 '''
             }
         }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo 'Refreshing Amazon ECR image pull secret'
+                sh '''
+                    set -eu
+
+                    aws ecr get-login-password --region "$AWS_REGION" |
+                        kubectl create secret docker-registry ecr-registry-secret \
+                            --namespace student-task-manager \
+                            --docker-server="$ECR_REGISTRY" \
+                            --docker-username=AWS \
+                            --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
+                            --dry-run=client -o yaml |
+                        kubectl apply -f -
+                '''
+
+                echo 'Updating Kubernetes deployment'
+                sh '''
+                    set -eu
+
+                    kubectl set image deployment/student-task-manager \
+                        student-task-manager="$ECR_REGISTRY/$ECR_REPOSITORY:${BUILD_NUMBER}" \
+                        --namespace student-task-manager
+
+                    kubectl rollout status deployment/student-task-manager \
+                        --namespace student-task-manager \
+                        --timeout=180s
+
+                    kubectl get pods --namespace student-task-manager
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo 'CI/CD image build and ECR push completed successfully!'
+            echo 'SUCCESS: Image built, pushed to ECR, and deployed to Kubernetes!'
         }
+
         failure {
-            echo 'Pipeline failed. Check Console Output for the error.'
+            echo 'FAILED: Check the Jenkins Console Output for the error.'
         }
     }
 }
+
 
