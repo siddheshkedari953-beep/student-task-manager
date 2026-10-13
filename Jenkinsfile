@@ -1,23 +1,21 @@
 pipeline {
-
     agent any
 
     stages {
-
         stage('Checkout') {
             steps {
                 echo 'Checking out project from GitHub...'
+                checkout scm
             }
         }
 
         stage('Build') {
             steps {
                 echo 'Building Student Task Manager...'
-
-                bat '''
-                    if not exist index.html exit /b 1
-                    if not exist style.css exit /b 1
-                    if not exist script.js exit /b 1
+                sh '''
+                    test -f index.html
+                    test -f style.css
+                    test -f script.js
                 '''
             }
         }
@@ -25,31 +23,28 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running project validation...'
-
-                bat '''
-                    findstr /C:"Student Task Manager" index.html
-                    findstr /C:"addTask" script.js
+                sh '''
+                    grep -q "Student Task Manager" index.html
+                    grep -q "addTask" script.js
                 '''
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Project deployment stage completed.'
+                echo 'Basic project validation completed.'
+                echo 'Docker, ECR and Kubernetes deployment will be added next.'
             }
         }
-
     }
 
     post {
-
         success {
-            echo 'CI/CD Pipeline completed successfully!'
+            echo 'CI pipeline completed successfully!'
         }
 
         failure {
             echo 'Pipeline failed. Check the console output.'
         }
-
     }
 }
