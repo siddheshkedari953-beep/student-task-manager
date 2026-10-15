@@ -1,353 +1,188 @@
-"use strict";
+/* ===== Student Task Manager — Modern UI ===== */
 
-/**
- * Student Task Manager
- * Layered architecture:
- *   Storage     -> persistence (localStorage, safe parse, validation)
- *   Store       -> single source of truth + subscribe/notify
- *   Selectors   -> pure functions that derive data from state
- *   View        -> DOM rendering only (no business logic)
- *   Controller  -> wires events to the Store
- */
-(() => {
-    const KEYS = { tasks: "stm.tasks.v2", theme: "stm.theme", ui: "stm.ui" };
-    const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
-    const $ = (id) => document.getElementById(id);
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-    /* ================= Storage ================= */
-    const Storage = {
-        read(key, fallback) {
-            try {
-                const raw = localStorage.getItem(key);
-                return raw ? JSON.parse(raw) : fallback;
-            } catch { return fallback; }
-        },
-        write(key, value) {
-            try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota or private mode */ }
-        },
-    };
+:root {
+    --primary: #635bff;
+    --primary-dark: #4f46e5;
+    --background: #f4f6fc;
+    --surface: #ffffff;
+    --text: #182230;
+    --muted: #667085;
+    --border: #e4e7ec;
+    --success: #12b76a;
+    --shadow: 0 8px 30px rgba(16, 24, 40, 0.07);
+}
 
-    /* ================= Model ================= */
-    const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: var(--background);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+    transition: background 0.3s ease;
+}
 
-    const sanitize = (t) => {
-        if (!t || typeof t.title !== "string" || !t.title.trim()) return null;
-        return {
-            id: typeof t.id === "string" ? t.id : uid(),
-            title: t.title.trim().slice(0, 120),
-            subject: String(t.subject || "").trim().slice(0, 40),
-            due: /^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : "",
-            priority: t.priority in PRIORITY_RANK ? t.priority : "medium",
-            done: Boolean(t.done),
-            createdAt: Number(t.createdAt) || Date.now(),
-        };
-    };
+/* Main content container */
+.container {
+    width: min(92%, 1000px);
+    margin: 45px auto;
+    padding: 30px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+}
 
-    /* ================= Store ================= */
-    const Store = (() => {
-        let state = {
-            tasks: Storage.read(KEYS.tasks, []).map(sanitize).filter(Boolean),
-            ui: { filter: "all", sort: "due", query: "", editingId: null, ...Storage.read(KEYS.ui, {}) },
-        };
-        state.ui.query = "";
-        state.ui.editingId = null;
-        const listeners = new Set();
+/* Headings */
+h1 {
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 800;
+    letter-spacing: -1.2px;
+    margin-bottom: 8px;
+    color: var(--text);
+}
 
-        const commit = (next) => {
-            state = next;
-            Storage.write(KEYS.tasks, state.tasks);
-            Storage.write(KEYS.ui, { filter: state.ui.filter, sort: state.ui.sort });
-            listeners.forEach((fn) => fn(state));
-        };
+h2 {
+    font-size: 22px;
+    margin: 26px 0 16px;
+    font-weight: 700;
+}
 
-        return {
-            get: () => state,
-            subscribe: (fn) => { listeners.add(fn); fn(state); },
-            setTasks: (tasks) => commit({ ...state, tasks }),
-            setUI: (patch) => commit({ ...state, ui: { ...state.ui, ...patch } }),
-            add(data) {
-                const task = sanitize({ ...data, id: uid(), done: false, createdAt: Date.now() });
-                if (task) this.setTasks([task, ...state.tasks]);
-            },
-            update(id, data) {
-                this.setTasks(state.tasks.map((t) => (t.id === id ? sanitize({ ...t, ...data }) || t : t)));
-            },
-            toggle(id) {
-                this.setTasks(state.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
-            },
-            remove(id) { this.setTasks(state.tasks.filter((t) => t.id !== id)); },
-        };
-    })();
+/* Description text */
+p {
+    color: var(--muted);
+}
 
-    /* ================= Selectors ================= */
-    const todayISO = () => {
-        const d = new Date();
-        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-    };
-    const daysUntil = (iso) => Math.round((new Date(iso + "T00:00:00") - new Date(todayISO() + "T00:00:00")) / 864e5);
-    const isOverdue = (t) => !t.done && t.due && t.due < todayISO();
+/* Input fields */
+input,
+textarea,
+select {
+    width: 100%;
+    padding: 13px 15px;
+    margin: 8px 0;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: #fff;
+    color: var(--text);
+    font: inherit;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
 
-    const Selectors = {
-        stats(tasks) {
-            const total = tasks.length;
-            const completed = tasks.filter((t) => t.done).length;
-            return {
-                total, completed,
-                pending: total - completed,
-                overdue: tasks.filter(isOverdue).length,
-                percent: total ? Math.round((completed / total) * 100) : 0,
-            };
-        },
-        visible({ tasks, ui }) {
-            const q = ui.query.trim().toLowerCase();
-            const list = tasks.filter((t) => {
-                if (ui.filter === "active" && t.done) return false;
-                if (ui.filter === "completed" && !t.done) return false;
-                return !q || t.title.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q);
-            });
-            const sorters = {
-                due: (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority],
-                priority: (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || (a.due || "9999").localeCompare(b.due || "9999"),
-                newest: (a, b) => b.createdAt - a.createdAt,
-            };
-            return list.sort((a, b) => a.done - b.done || sorters[ui.sort](a, b));
-        },
-        subjects: (tasks) => [...new Set(tasks.map((t) => t.subject).filter(Boolean))].sort(),
-        dueLabel(t) {
-            if (!t.due) return null;
-            const n = daysUntil(t.due);
-            const text = n === 0 ? "Due today" : n === 1 ? "Due tomorrow" : n === -1 ? "1 day overdue" : n < 0 ? `${-n} days overdue` : `Due in ${n} days`;
-            const tone = t.done ? "" : n < 0 ? "overdue" : n <= 2 ? "soon" : "";
-            return { text, tone };
-        },
-    };
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(99, 91, 255, 0.12);
+}
 
-    /* ================= View ================= */
-    const View = {
-        el: {
-            list: $("taskList"), empty: $("emptyMessage"), subjects: $("subjectList"),
-            toast: $("toast"), toastText: $("toastText"), toastUndo: $("toastUndo"),
-        },
-        toastTimer: null,
+/* Buttons */
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 11px;
+    background: var(--primary);
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+}
 
-        render(state) {
-            const s = Selectors.stats(state.tasks);
-            $("totalTasks").textContent = s.total;
-            $("completedTasks").textContent = s.completed;
-            $("pendingTasks").textContent = s.pending;
-            $("overdueTasks").textContent = s.overdue;
-            $("progressFill").style.width = s.percent + "%";
-            $("progressBar").setAttribute("aria-valuenow", s.percent);
-            $("progressText").textContent = `${s.percent}% done`;
-            $("tasksLeft").textContent = `${s.pending} ${s.pending === 1 ? "task" : "tasks"} left`;
-            $("clearCompleted").disabled = s.completed === 0;
+button:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(99, 91, 255, 0.25);
+}
 
-            const counts = { all: s.total, active: s.pending, completed: s.completed };
-            document.querySelectorAll("#filters button").forEach((b) => {
-                b.setAttribute("aria-pressed", String(b.dataset.filter === state.ui.filter));
-                b.querySelector(".count").textContent = counts[b.dataset.filter];
-            });
-            if ($("sortSelect").value !== state.ui.sort) $("sortSelect").value = state.ui.sort;
+button:active {
+    transform: translateY(0);
+}
 
-            this.el.subjects.replaceChildren(...Selectors.subjects(state.tasks).map((s) => new Option(s)));
+/* Task cards and list items */
+.task,
+.task-item,
+li {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
 
-            const visible = Selectors.visible(state);
-            this.el.list.replaceChildren(...visible.map((t) => this.row(t)));
-            this.el.empty.hidden = visible.length > 0;
-            this.el.empty.textContent = state.tasks.length
-                ? "No tasks match your search or filter."
-                : "No tasks yet. Add your first task above.";
-        },
+.task,
+.task-item {
+    padding: 16px 18px;
+    margin: 12px 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+}
 
-        row(t) {
-            const li = document.createElement("li");
-            li.className = "task" + (t.done ? " done" : "");
-            li.dataset.id = t.id;
-            li.dataset.priority = t.priority;
+.task:hover,
+.task-item:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
+    border-color: #c7c4ff;
+}
 
-            const check = document.createElement("input");
-            check.type = "checkbox";
-            check.checked = t.done;
-            check.dataset.action = "toggle";
-            check.setAttribute("aria-label", `Mark "${t.title}" as ${t.done ? "not done" : "done"}`);
+/* Task lists */
+ul {
+    list-style: none;
+}
 
-            const body = document.createElement("div");
-            const title = document.createElement("div");
-            title.className = "task-title";
-            title.textContent = t.title; // textContent -> no XSS
-            const meta = document.createElement("div");
-            meta.className = "meta";
-            const chip = (text, tone = "") => {
-                const c = document.createElement("span");
-                c.className = "chip " + tone;
-                c.textContent = text;
-                return c;
-            };
-            meta.append(chip(t.priority[0].toUpperCase() + t.priority.slice(1)));
-            if (t.subject) meta.append(chip(t.subject));
-            const due = Selectors.dueLabel(t);
-            if (due) meta.append(chip(due.text, due.tone));
-            body.append(title, meta);
+li {
+    margin-bottom: 8px;
+}
 
-            const actions = document.createElement("div");
-            actions.className = "row-actions";
-            [["edit", "Edit"], ["delete", "Delete"]].forEach(([action, label]) => {
-                const b = document.createElement("button");
-                b.type = "button";
-                b.className = action;
-                b.dataset.action = action;
-                b.textContent = label;
-                b.setAttribute("aria-label", `${label} "${t.title}"`);
-                actions.append(b);
-            });
+/* Completed tasks */
+.completed,
+.task.completed {
+    opacity: 0.7;
+    text-decoration: line-through;
+    border-left: 4px solid var(--success);
+}
 
-            li.append(check, body, actions);
-            return li;
-        },
+/* Status labels */
+.status,
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #eeecff;
+    color: var(--primary-dark);
+    font-size: 12px;
+    font-weight: 700;
+}
 
-        fillForm(task) {
-            const editing = Boolean(task);
-            $("taskId").value = editing ? task.id : "";
-            $("taskInput").value = editing ? task.title : "";
-            $("subjectInput").value = editing ? task.subject : "";
-            $("dueInput").value = editing ? task.due : "";
-            $("priorityInput").value = editing ? task.priority : "medium";
-            $("submitBtn").textContent = editing ? "Save changes" : "Add task";
-            $("cancelEdit").hidden = !editing;
-            $("taskForm").classList.toggle("editing", editing);
-            $("formError").hidden = true;
-            $("taskInput").focus();
-        },
+/* Links */
+a {
+    color: var(--primary);
+    text-decoration: none;
+    transition: color 0.2s;
+}
 
-        toast(text, onUndo) {
-            clearTimeout(this.toastTimer);
-            this.el.toastText.textContent = text;
-            this.el.toastUndo.hidden = !onUndo;
-            this.el.toastUndo.onclick = () => { onUndo(); this.hideToast(); };
-            this.el.toast.hidden = false;
-            this.toastTimer = setTimeout(() => this.hideToast(), 6000);
-        },
-        hideToast() { this.el.toast.hidden = true; },
-    };
+a:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
 
-    /* ================= Controller ================= */
-    const Controller = {
-        init() {
-            this.applyTheme(Storage.read(KEYS.theme, matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
-            $("todayLabel").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
-            Store.subscribe((s) => View.render(s));
-            this.bind();
-        },
+/* Mobile responsive layout */
+@media (max-width: 600px) {
+    .container {
+        width: 94%;
+        margin: 20px auto;
+        padding: 18px;
+        border-radius: 16px;
+    }
 
-        applyTheme(theme) {
-            document.documentElement.dataset.theme = theme;
-            $("themeToggle").textContent = theme === "dark" ? "Light mode" : "Dark mode";
-            $("themeToggle").setAttribute("aria-pressed", String(theme === "dark"));
-            Storage.write(KEYS.theme, theme);
-        },
+    h1 {
+        font-size: 28px;
+    }
 
-        readForm() {
-            return {
-                title: $("taskInput").value,
-                subject: $("subjectInput").value,
-                due: $("dueInput").value,
-                priority: $("priorityInput").value,
-            };
-        },
-
-        bind() {
-            $("taskForm").addEventListener("submit", (e) => {
-                e.preventDefault();
-                const data = this.readForm();
-                if (!data.title.trim()) {
-                    $("formError").textContent = "Enter a task name to continue.";
-                    $("formError").hidden = false;
-                    $("taskInput").focus();
-                    return;
-                }
-                const id = $("taskId").value;
-                if (id) { Store.update(id, data); View.toast("Changes saved"); }
-                else Store.add(data);
-                Store.setUI({ editingId: null });
-                View.fillForm(null);
-            });
-
-            $("cancelEdit").addEventListener("click", () => { Store.setUI({ editingId: null }); View.fillForm(null); });
-
-            $("taskList").addEventListener("click", (e) => {
-                const btn = e.target.closest("[data-action]");
-                const li = e.target.closest(".task");
-                if (!btn || !li) return;
-                const task = Store.get().tasks.find((t) => t.id === li.dataset.id);
-                if (!task) return;
-                if (btn.dataset.action === "toggle") Store.toggle(task.id);
-                if (btn.dataset.action === "edit") View.fillForm(task);
-                if (btn.dataset.action === "delete") {
-                    const before = Store.get().tasks;
-                    Store.remove(task.id);
-                    View.toast("Task deleted", () => Store.setTasks(before));
-                }
-            });
-
-            $("clearCompleted").addEventListener("click", () => {
-                const before = Store.get().tasks;
-                const n = before.filter((t) => t.done).length;
-                if (!n) return;
-                Store.setTasks(before.filter((t) => !t.done));
-                View.toast(`${n} completed ${n === 1 ? "task" : "tasks"} cleared`, () => Store.setTasks(before));
-            });
-
-            $("filters").addEventListener("click", (e) => {
-                const b = e.target.closest("[data-filter]");
-                if (b) Store.setUI({ filter: b.dataset.filter });
-            });
-            $("sortSelect").addEventListener("change", (e) => Store.setUI({ sort: e.target.value }));
-
-            let debounce;
-            $("searchInput").addEventListener("input", (e) => {
-                clearTimeout(debounce);
-                debounce = setTimeout(() => Store.setUI({ query: e.target.value }), 120);
-            });
-
-            $("themeToggle").addEventListener("click", () =>
-                this.applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
-
-            $("exportBtn").addEventListener("click", () => this.exportJSON());
-            $("importBtn").addEventListener("click", () => $("importFile").click());
-            $("importFile").addEventListener("change", (e) => this.importJSON(e.target.files[0]));
-
-            document.addEventListener("keydown", (e) => {
-                const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
-                if (e.key === "/" && !typing) { e.preventDefault(); $("searchInput").focus(); }
-                if (e.key === "Escape" && $("taskId").value) View.fillForm(null);
-                if (e.key === "Escape") View.hideToast();
-            });
-        },
-
-        exportJSON() {
-            const blob = new Blob([JSON.stringify(Store.get().tasks, null, 2)], { type: "application/json" });
-            const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `tasks-${todayISO()}.json` });
-            a.click();
-            URL.revokeObjectURL(a.href);
-        },
-
-        async importJSON(file) {
-            if (!file) return;
-            try {
-                const parsed = JSON.parse(await file.text());
-                if (!Array.isArray(parsed)) throw new Error("not an array");
-                const incoming = parsed.map(sanitize).filter(Boolean);
-                const have = new Set(Store.get().tasks.map((t) => t.id));
-                const fresh = incoming.filter((t) => !have.has(t.id));
-                const before = Store.get().tasks;
-                Store.setTasks([...fresh, ...before]);
-                View.toast(`Imported ${fresh.length} ${fresh.length === 1 ? "task" : "tasks"}`, () => Store.setTasks(before));
-            } catch {
-                View.toast("Import failed. Choose a JSON file exported from this app.");
-            }
-            $("importFile").value = "";
-        },
-    };
-
-    Controller.init();
-})();
+    button {
+        width: 100%;
+        margin-top: 8px;
+    }
+}
