@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -35,8 +34,20 @@ pipeline {
                 echo 'Running project validation'
                 sh '''
                     set -eu
+
+                    # HTML has the title and links the script and stylesheet
                     grep -q "Student Task Manager" index.html
-                    grep -q "addTask" script.js
+                    grep -q 'src="script.js"' index.html
+                    grep -q 'href="style.css"' index.html
+
+                    # JS has the main layers of the new architecture
+                    grep -q "const Store" script.js
+                    grep -q "const Controller" script.js
+
+                    # JS has no syntax errors (only runs if Node is installed)
+                    if command -v node >/dev/null 2>&1; then
+                        node --check script.js
+                    fi
                 '''
             }
         }
@@ -122,6 +133,3 @@ pipeline {
         }
     }
 }
-
-
-
