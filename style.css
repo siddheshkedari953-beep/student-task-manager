@@ -32,9 +32,9 @@
     --line:        light-dark(oklch(90% 0.012 265),  oklch(30% 0.025 265));
     --line-strong: light-dark(oklch(84% 0.015 265),  oklch(38% 0.03 265));
 
-    /* Accent (CHANGED: indigo -> teal) */
-    --accent:      light-dark(oklch(55% 0.13 195),   oklch(76% 0.13 195));
-    --accent-soft: light-dark(oklch(95% 0.035 195),  oklch(28% 0.05 195));
+    /* Accent */
+    --accent:      light-dark(oklch(54% 0.22 275),   oklch(72% 0.16 275));
+    --accent-soft: light-dark(oklch(94% 0.04 275),   oklch(28% 0.06 275));
     --accent-ink:  light-dark(oklch(100% 0 0),       oklch(14% 0.02 265));
 
     /* Semantic */
@@ -69,14 +69,7 @@
 
   body {
     font-family: var(--font);
-    background-color: var(--bg);
-    /* CHANGED: soft accent glow in the top-left corner */
-    background-image: radial-gradient(
-      60rem 28rem at 8% -8%,
-      color-mix(in oklab, var(--accent) 11%, transparent),
-      transparent 70%
-    );
-    background-attachment: fixed;
+    background: var(--bg);
     color: var(--ink);
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -105,13 +98,6 @@
     letter-spacing: -0.04em;
     line-height: 1.05;
     text-wrap: balance;
-
-    /* CHANGED: subtle ink-to-accent gradient on the title */
-    background: linear-gradient(115deg, var(--ink) 45%, var(--accent));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
   }
 
   h2 {
@@ -282,8 +268,6 @@
     padding: 1.15rem 1.25rem;
     background: var(--surface);
     border: 1px solid var(--line);
-    /* CHANGED: thin accent line on top of each stat card */
-    border-block-start: 3px solid color-mix(in oklab, var(--accent) 70%, transparent);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-sm);
     transition: transform 0.2s, box-shadow 0.2s;
@@ -306,10 +290,6 @@
       font-size: 0.84rem;
       margin-block-start: 0.4rem;
       font-weight: 500;
-    }
-
-    &.danger {
-      border-block-start-color: color-mix(in oklab, var(--danger) 70%, transparent);
     }
 
     &.danger h3 { color: var(--danger); }
