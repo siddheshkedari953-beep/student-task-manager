@@ -156,7 +156,7 @@
             this.el.empty.hidden = visible.length > 0;
             this.el.empty.textContent = state.tasks.length
                 ? "No tasks match your search or filter."
-                : "No tasks yet. Add your first task above.";
+                : "Nothing here yet. Add your first task above!";
         },
 
         row(t) {
@@ -225,7 +225,7 @@
             this.el.toastUndo.hidden = !onUndo;
             this.el.toastUndo.onclick = () => { onUndo(); this.hideToast(); };
             this.el.toast.hidden = false;
-            this.toastTimer = setTimeout(() => this.hideToast(), 6000);
+            this.toastTimer = setTimeout(() => this.hideToast(), 4000);
         },
         hideToast() { this.el.toast.hidden = true; },
     };
