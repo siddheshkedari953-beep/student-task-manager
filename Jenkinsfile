@@ -1,135 +1,654 @@
-pipeline {
-    agent any
+/* ==========================================================
+   Student Task Manager — Premium 2026 Edition
+   ========================================================== */
+@layer reset, tokens, base, components, responsive;
 
-    environment {
-        AWS_REGION = 'ap-southeast-2'
-        ECR_REGISTRY = '756501293924.dkr.ecr.ap-southeast-2.amazonaws.com'
-        ECR_REPOSITORY = 'student-task-manager'
-        KUBECONFIG = '/var/lib/jenkins/.kube/config'
+/* ---------- Reset ---------- */
+@layer reset {
+  *, *::before, *::after { box-sizing: border-box; }
+  * { margin: 0; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  img, svg { display: block; max-inline-size: 100%; }
+}
+
+/* ---------- Design tokens ---------- */
+@layer tokens {
+  :root {
+    color-scheme: light dark;
+
+    /* Surfaces */
+    --bg:          light-dark(oklch(97.8% 0.008 265), oklch(14.5% 0.018 265));
+    --surface:     light-dark(oklch(100% 0 0),       oklch(19.5% 0.022 265));
+    --surface-2:   light-dark(oklch(96.2% 0.01 265), oklch(24% 0.025 265));
+    --surface-3:   light-dark(oklch(93.5% 0.012 265), oklch(28% 0.028 265));
+
+    /* Text */
+    --ink:         light-dark(oklch(20% 0.03 265),   oklch(96% 0.01 265));
+    --muted:       light-dark(oklch(48% 0.03 265),   oklch(70% 0.02 265));
+    --faint:       light-dark(oklch(62% 0.02 265),   oklch(55% 0.02 265));
+
+    /* Borders & lines */
+    --line:        light-dark(oklch(90% 0.012 265),  oklch(30% 0.025 265));
+    --line-strong: light-dark(oklch(84% 0.015 265),  oklch(38% 0.03 265));
+
+    /* Accent (CHANGED: indigo -> teal) */
+    --accent:      light-dark(oklch(55% 0.13 195),   oklch(76% 0.13 195));
+    --accent-soft: light-dark(oklch(95% 0.035 195),  oklch(28% 0.05 195));
+    --accent-ink:  light-dark(oklch(100% 0 0),       oklch(14% 0.02 265));
+
+    /* Semantic */
+    --danger:      light-dark(oklch(55% 0.21 25),    oklch(70% 0.17 22));
+    --warn:        light-dark(oklch(62% 0.15 70),    oklch(78% 0.14 80));
+    --ok:          light-dark(oklch(55% 0.15 160),   oklch(75% 0.14 160));
+
+    /* Radius */
+    --r-xs: 6px;
+    --r-sm: 9px;
+    --r-md: 14px;
+    --r-lg: 20px;
+    --r-xl: 28px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px color-mix(in oklab, var(--ink) 6%, transparent);
+    --shadow:    0 2px 4px color-mix(in oklab, var(--ink) 5%, transparent),
+                 0 12px 28px -10px color-mix(in oklab, var(--ink) 14%, transparent);
+    --shadow-lg: 0 4px 8px color-mix(in oklab, var(--ink) 6%, transparent),
+                 0 20px 40px -12px color-mix(in oklab, var(--ink) 18%, transparent);
+
+    --font: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"]  { color-scheme: dark; }
+}
+
+/* ---------- Base ---------- */
+@layer base {
+  html { scrollbar-gutter: stable; }
+
+  body {
+    font-family: var(--font);
+    background-color: var(--bg);
+    /* CHANGED: soft accent glow in the top-left corner */
+    background-image: radial-gradient(
+      60rem 28rem at 8% -8%,
+      color-mix(in oklab, var(--accent) 11%, transparent),
+      transparent 70%
+    );
+    background-attachment: fixed;
+    color: var(--ink);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 28%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--r-sm);
+  }
+
+  .container {
+    max-width: 58rem;
+    margin-inline: auto;
+    padding: clamp(1.5rem, 5vw, 3.5rem) clamp(1.1rem, 4vw, 1.75rem) 7rem;
+  }
+
+  h1 {
+    font-size: clamp(2.15rem, 5.5vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    text-wrap: balance;
+
+    /* CHANGED: subtle ink-to-accent gradient on the title */
+    background: linear-gradient(115deg, var(--ink) 45%, var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin-block-end: 0.7rem;
+  }
+
+  label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--muted);
+  }
+}
+
+/* ---------- Components ---------- */
+@layer components {
+
+  /* Header */
+  .top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-block-end: 2.25rem;
+
+    & p {
+      color: var(--muted);
+      margin-block-start: 0.45rem;
+      font-size: 0.95rem;
+    }
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+
+  /* Buttons */
+  .primary, .ghost, .link {
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    padding: 0.68rem 1.2rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    transition: background-color 0.18s, border-color 0.18s, transform 0.12s, filter 0.18s, box-shadow 0.18s;
+
+    &:active:not(:disabled) { transform: scale(0.965); }
+    &:disabled { opacity: 0.42; cursor: not-allowed; }
+  }
+
+  .primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    box-shadow: 0 1px 2px color-mix(in oklab, var(--accent) 25%, transparent);
+
+    &:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 4px 14px -3px color-mix(in oklab, var(--accent) 45%, transparent);
+    }
+  }
+
+  .ghost {
+    background: var(--surface);
+    border-color: var(--line);
+    box-shadow: var(--shadow-sm);
+
+    &:hover {
+      background: var(--surface-2);
+      border-color: var(--line-strong);
+    }
+  }
+
+  .link {
+    background: none;
+    color: var(--accent);
+    padding-inline: 0.55rem;
+
+    &:hover:not(:disabled) {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* Inputs */
+  input:not([type="checkbox"], [type="hidden"]),
+  select {
+    inline-size: 100%;
+    padding: 0.72rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+
+    &::placeholder {
+      color: color-mix(in oklab, var(--muted) 65%, transparent);
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                echo 'Checking out source from GitHub'
-                checkout scm
-            }
-        }
-
-        stage('Build') {
-            steps {
-                echo 'Validating project files'
-                sh '''
-                    set -eu
-                    test -f index.html
-                    test -f style.css
-                    test -f script.js
-                    test -f Dockerfile
-                '''
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo 'Running project validation'
-                sh '''
-                    set -eu
-
-                    # HTML has the title and links the script and stylesheet
-                    grep -q "Student Task Manager" index.html
-                    grep -q 'src="script.js"' index.html
-                    grep -q 'href="style.css"' index.html
-
-                    # JS has the main layers of the new architecture
-                    grep -q "const Store" script.js
-                    grep -q "const Controller" script.js
-
-                    # JS has no syntax errors (only runs if Node is installed)
-                    if command -v node >/dev/null 2>&1; then
-                        node --check script.js
-                    fi
-                '''
-            }
-        }
-
-        stage('Docker Build') {
-            steps {
-                echo 'Building Docker image'
-                sh '''
-                    set -eu
-                    docker build -t student-task-manager:${BUILD_NUMBER} .
-                '''
-            }
-        }
-
-        stage('Push to Amazon ECR') {
-            steps {
-                echo 'Authenticating with Amazon ECR'
-                sh '''
-                    set -eu
-
-                    aws sts get-caller-identity
-
-                    aws ecr get-login-password --region "$AWS_REGION" |
-                        docker login --username AWS --password-stdin "$ECR_REGISTRY"
-
-                    docker tag student-task-manager:${BUILD_NUMBER} \
-                        "$ECR_REGISTRY/$ECR_REPOSITORY:${BUILD_NUMBER}"
-
-                    docker tag student-task-manager:${BUILD_NUMBER} \
-                        "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-
-                    docker push "$ECR_REGISTRY/$ECR_REPOSITORY:${BUILD_NUMBER}"
-                    docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-                '''
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                echo 'Refreshing Amazon ECR image pull secret'
-                sh '''
-                    set +x
-                    set -eu
-
-                    ECR_PASSWORD="$(aws ecr get-login-password --region "$AWS_REGION")"
-
-                    kubectl create secret docker-registry ecr-registry-secret \
-                        --namespace student-task-manager \
-                        --docker-server="$ECR_REGISTRY" \
-                        --docker-username=AWS \
-                        --docker-password="$ECR_PASSWORD" \
-                        --dry-run=client -o yaml |
-                    kubectl apply -f -
-
-                    unset ECR_PASSWORD
-                '''
-
-                echo 'Updating Kubernetes deployment'
-                sh '''
-                    set -eu
-
-                    kubectl set image deployment/student-task-manager \
-                        student-task-manager="$ECR_REGISTRY/$ECR_REPOSITORY:${BUILD_NUMBER}" \
-                        --namespace student-task-manager
-
-                    kubectl rollout status deployment/student-task-manager \
-                        --namespace student-task-manager \
-                        --timeout=180s
-
-                    kubectl get pods --namespace student-task-manager
-                '''
-            }
-        }
+    &:hover {
+      border-color: var(--line-strong);
     }
 
-    post {
-        success {
-            echo 'SUCCESS: Image built, pushed to ECR, and deployed to Kubernetes!'
-        }
-
-        failure {
-            echo 'FAILED: Check the Jenkins Console Output for the error.'
-        }
+    &:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 20%, transparent);
+      background: var(--surface);
     }
+  }
+
+  /* Add / Edit form */
+  .task-input {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+    gap: 1.1rem;
+    align-items: end;
+    padding: 1.4rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow);
+    transition: border-color 0.22s, box-shadow 0.22s;
+
+    &.editing {
+      border-color: var(--accent);
+      box-shadow:
+        0 0 0 4px color-mix(in oklab, var(--accent) 16%, transparent),
+        var(--shadow-lg);
+    }
+  }
+
+  .field {
+    display: grid;
+    gap: 0.38rem;
+  }
+
+  .field.grow {
+    grid-column: 1 / -1;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 0.55rem;
+
+    & .primary { flex: 1; }
+  }
+
+  .form-error {
+    grid-column: 1 / -1;
+    color: var(--danger);
+    font-size: 0.9rem;
+    font-weight: 550;
+  }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.85rem;
+    margin-block: 1.75rem 0.9rem;
+  }
+
+  .stat-box {
+    padding: 1.15rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    /* CHANGED: thin accent line on top of each stat card */
+    border-block-start: 3px solid color-mix(in oklab, var(--accent) 70%, transparent);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s, box-shadow 0.2s;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    & h3 {
+      font-size: clamp(1.95rem, 4.2vw, 2.7rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.035em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    & p {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin-block-start: 0.4rem;
+      font-weight: 500;
+    }
+
+    &.danger {
+      border-block-start-color: color-mix(in oklab, var(--danger) 70%, transparent);
+    }
+
+    &.danger h3 { color: var(--danger); }
+  }
+
+  /* Progress */
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.95rem;
+    margin-block-end: 1.6rem;
+  }
+
+  .progress {
+    flex: 1;
+    block-size: 0.55rem;
+    background: var(--surface-3);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    block-size: 100%;
+    inline-size: 0;
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--ok) 85%, var(--accent)),
+      var(--ok)
+    );
+    border-radius: inherit;
+    transition: inline-size 0.55s cubic-bezier(0.22, 0.9, 0.25, 1);
+  }
+
+  #progressText {
+    min-inline-size: 5.2rem;
+    text-align: end;
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    padding-block: 0.85rem;
+    margin-block-end: 0.85rem;
+    background: color-mix(in oklab, var(--bg) 82%, transparent);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+
+    & input[type="search"] {
+      flex: 1 1 14rem;
+      inline-size: auto;
+    }
+
+    & select { inline-size: auto; }
+  }
+
+  .segmented {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+
+    & button {
+      background: none;
+      border: 0;
+      padding: 0.48rem 0.9rem;
+      border-radius: calc(var(--r-md) - 3px);
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+
+      &:hover {
+        background: color-mix(in oklab, var(--ink) 5%, transparent);
+      }
+
+      &[aria-pressed="true"] {
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
+        font-weight: 650;
+      }
+    }
+  }
+
+  .count {
+    color: var(--muted);
+    font-size: 0.76rem;
+    margin-inline-start: 0.18rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Task list */
+  .notebook {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .task {
+    --tone: var(--line);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.95rem;
+    padding: 0.95rem 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-inline-start: 4px solid var(--tone);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s, background 0.18s;
+
+    &:hover {
+      box-shadow: var(--shadow);
+      transform: translateY(-1px);
+    }
+
+    &[data-priority="high"]   { --tone: var(--danger); }
+    &[data-priority="medium"] { --tone: var(--warn); }
+    &[data-priority="low"]    { --tone: var(--ok); }
+
+    &.done {
+      background: color-mix(in oklab, var(--surface) 60%, var(--bg));
+      --tone: var(--line);
+      opacity: 0.85;
+    }
+  }
+
+  .task-title {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+
+  .task.done .task-title {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+    text-decoration-color: color-mix(in oklab, var(--muted) 60%, transparent);
+  }
+
+  /* Custom checkbox */
+  .task input[type="checkbox"] {
+    appearance: none;
+    display: grid;
+    place-content: center;
+    inline-size: 1.35rem;
+    block-size: 1.35rem;
+    border: 2px solid color-mix(in oklab, var(--muted) 55%, transparent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.18s, border-color 0.18s, transform 0.15s;
+
+    &::before {
+      content: "";
+      inline-size: 0.6rem;
+      block-size: 0.6rem;
+      background: var(--accent-ink);
+      clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+      scale: 0;
+      transition: scale 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    &:hover {
+      border-color: var(--accent);
+      transform: scale(1.08);
+    }
+
+    &:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+
+      &::before { scale: 1; }
+    }
+  }
+
+  /* Meta chips */
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-block-start: 0.4rem;
+  }
+
+  .chip {
+    padding: 0.15rem 0.65rem;
+    font-size: 0.74rem;
+    font-weight: 550;
+    color: var(--muted);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    letter-spacing: 0.01em;
+
+    &.soon {
+      color: var(--warn);
+      border-color: color-mix(in oklab, var(--warn) 40%, transparent);
+      background: color-mix(in oklab, var(--warn) 9%, transparent);
+    }
+
+    &.overdue {
+      color: var(--danger);
+      border-color: color-mix(in oklab, var(--danger) 40%, transparent);
+      background: color-mix(in oklab, var(--danger) 9%, transparent);
+    }
+  }
+
+  /* Row actions */
+  .row-actions {
+    display: flex;
+    gap: 0.1rem;
+
+    & button {
+      background: none;
+      border: 0;
+      padding: 0.42rem 0.7rem;
+      font-size: 0.84rem;
+      font-weight: 550;
+      color: var(--muted);
+      border-radius: var(--r-sm);
+      transition: background 0.15s, color 0.15s;
+
+      &:hover {
+        background: var(--surface-2);
+        color: var(--ink);
+      }
+
+      &.delete:hover {
+        color: var(--danger);
+        background: color-mix(in oklab, var(--danger) 10%, transparent);
+      }
+    }
+  }
+
+  @media (hover: hover) {
+    .row-actions {
+      opacity: 0;
+      transition: opacity 0.18s;
+    }
+
+    .task:hover .row-actions,
+    .task:focus-within .row-actions {
+      opacity: 1;
+    }
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding-block: 3.5rem;
+    font-size: 0.98rem;
+  }
+
+  .list-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-block-start: 1.15rem;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 1.75rem;
+    inline-size: fit-content;
+    max-inline-size: calc(100% - 2.5rem);
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 0.85rem 1.15rem 0.85rem 1.35rem;
+    background: var(--ink);
+    color: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: 0 16px 40px -10px color-mix(in oklab, black 50%, transparent);
+    font-weight: 500;
+    transition: opacity 0.28s, translate 0.28s, display 0.28s allow-discrete;
+
+    @starting-style {
+      opacity: 0;
+      translate: 0 0.85rem;
+    }
+
+    & button {
+      background: none;
+      border: 0;
+      color: inherit;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      padding: 0.2rem 0.4rem;
+    }
+  }
+}
+
+/* ---------- Responsive ---------- */
+@layer responsive {
+  @media (max-width: 40rem) {
+    .task {
+      grid-template-columns: auto 1fr;
+    }
+
+    .row-actions {
+      grid-column: 2;
+      opacity: 1;
+    }
+
+    .toolbar select,
+    .segmented {
+      inline-size: 100%;
+    }
+
+    .segmented button {
+      flex: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+[hidden] {
+  display: none !important;
 }
